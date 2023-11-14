@@ -1,13 +1,22 @@
-
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.style as style
-import sys
+import boto3
+import io
 
-df_season_1=pd.read_csv('E0-2324.csv')
-df_season_2 = pd.read_csv('E0-2223.csv')
-df_season_2_second =pd.read_csv('E1-2223.csv')
+s3_client = boto3.client('s3')
+
+bucket_name = 'football-prediction-test'
+file_paths = ['E0-2324.csv', 'E0-2223.csv', 'E1-2223.csv']
+
+dfs = []
+for file_path in file_paths:
+    response = s3_client.get_object(Bucket=bucket_name, Key=file_path)
+    df = pd.read_csv(io.BytesIO(response['Body'].read()))
+    dfs.append(df)
+
+df_season_1 = dfs[0]
+df_season_2 = dfs[1]
+df_season_2_second = dfs[2]
 
 
 df_burnley_home= df_season_2_second[df_season_2_second['HomeTeam']=='Burnley']
@@ -44,4 +53,9 @@ df_both_seasons_essentials['ATGDIFF'] = df_both_seasons_essentials['FTAG'] - df_
 
 df_both_seasons_essentials= df_both_seasons_essentials.sort_values(['Year', 'Month','Day'], ascending=False)
 
-df_both_seasons_essentials.to_csv('df_both_seasons_essentials', index=False)
+output_bucket_name = 'football-prediction-test'
+output_file_path = 'E0-2324-ProcessesData.csv'
+
+df_both_seasons_essentials.to_csv(output_file_path, index=False)
+with open(output_file_path, 'rb') as file:
+    s3_client.upload_fileobj(file, output_bucket_name, output_file_path)
